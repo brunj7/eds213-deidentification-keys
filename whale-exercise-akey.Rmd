@@ -1,0 +1,129 @@
+---
+title: "sdcmicro-whale-exercise"
+author: "Answer Key"
+date: "2024-05-24"
+output: html_document
+---
+
+# Whale Entanglement sdcMicro Exercise
+
+Your team acquired a dataset\* [whale-sdc.csv](whale-sdc.csv) from researchers working with whale entanglement data on the West Coast. The dataset contains both direct and indirect identifiers. Your task is to assess the risk of re-identification of the fisheries associated with the cases before considering public release. Then, you should test one technique and apply k-anonymization to help lower the disclosure risk as well as compute the information loss.
+
+Please complete this exercise in pairs or groups of three. Each group should download the dataset and complete the rmd file, including the code and answering the questions. Remember to include your names in the YAML.
+
+*\*This dataset was purposefully adapted exclusively for instruction use.*
+
+#### *Setup*
+
+#### Package & Data
+
+```{r}
+library(sdcMicro)
+whale <- read.csv("whale-sdc.csv")
+```
+
+#### Inspect the Dataset
+
+```{r}
+df <- read.csv("whale-sdc.csv")
+head(df)
+str(df)
+```
+
+#### Q1. How many direct identifiers are present in this dataset? What are they?
+
+A: There are 3 direct identifiers Case ID, lat and long (combined) and fishery license.
+
+#### **Q2. What attributes would you consider quasi-identifiers? Why?**
+
+A: By combining "state", "origin" and "county", one can still potentially re-identify fisheries present in this dataset. Other variables would require very specific inside information.
+
+#### **Q3. What types of variables are they? Define them. (numeric, integer, factor or string)**
+
+Make sure to have them set correctly.
+
+```{r}
+fname = "whale-sdc.csv"
+file <- read.csv(fname)
+file <- varToFactor(obj=file, var=c("type", "county", "state", "condition", "origin", "gear", "fine", "infraction_type"))
+file <- varToNumeric(obj=file, var=c("year", "month"))
+```
+
+#### ***4 Considering your answers to questions 1, 2 and 3 create a SDC problem.***
+
+#### **Q4.1 What is the risk of re-identification for this dataset?**
+
+
+```{r}
+
+sdcInitial <- createSdcObj(dat=whale,
+                       keyVars=c("state", "origin","county"), #these are the categorical variables that we consider critical to re-id.
+                       weightVar=NULL,
+                       hhId=NULL,
+                       strataVar=NULL,
+                       pramVars=NULL,
+                       excludeVars=c("case_id", "lat", "long", "fishery_license"), #direct identifiers
+                       seed=0,
+                       randomizeRecords=FALSE,
+                       alpha=c(1))
+```
+
+
+
+#### Q4.2 To what extent does this dataset violate k-anonymity?
+
+```{r}
+# Summary of object
+sdcInitial
+```
+Number of observations violating
+  - 2-anonymity: 9 (2.586%)
+  - 3-anonymity: 15 (4.310%)
+  - 5-anonymity: 31 (8.908%)
+  
+```{r}
+#We can also check the re-id risk percentage for this dataset
+sdcInitial@risk$global$risk
+```
+  
+Not too bad, huh? But let's aim for 0 2-anonymity, meaning that at least 3 fisheries will share the same attributes in the dataset.
+
+#### *5. Consider techniques that could reduce the risk of re-identification.*
+
+#### Q5.1 Apply one non-perturbative method to a variable of your choice. How effective was it in lowering the disclosure risk?
+
+```{r}
+#One approach we could follow would be to aggregate values for tribal and recreational fisheries to hide them a little bit more in the crowd. Let's have them recoded as non-commercial. 
+
+table(sdcInitial@manipKeyVars$origin)
+
+#Recode origins
+sdcInitial  <-  groupAndRename(obj = sdcInitial, var = c("origin"),
+                          before = c("recreational", "tribal"),
+                          after = c("non-commercial"))
+
+#Compute disclosure risk for transformed data
+sdcInitial
+
+```
+No improvement, right? We still have the same number of cases violating k-anonymity. So let's sdcMicro do the work for us. 
+
+#### Q5.2 Apply ( k-3) anonymization to this dataset.
+
+```{r}
+
+sdcInitial <- kAnon(sdcInitial, k=c(3))
+
+#Compute disclosure risk for transformed data
+sdcInitial
+
+```
+That was a great improvement! Results indicate the we now have only 3 cases that don't share 5 twins in this dataset. But one more step, let's check the extend to which the data was affected by this process.
+#### Q6. Compute the information loss for the de-identified version of the dataset. 
+
+```{r}
+print(sdcInitial, "ls")
+```
+Given that there were no missing values in the original dataset, we can assert that in order to attain a minimum 3-anonymity level for the dataset subsequent to the removal of direct identifiers and the adjustment of select variables to mitigate disclosure risks, we had to sacrifice precision for the "county" variable in 15 instances.
+
+It's worth noting that if we were contemplating sharing this dataset, prior to exporting it, we would need to generate a unique random hash ID for each represented case.
