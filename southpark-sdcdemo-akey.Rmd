@@ -155,10 +155,10 @@ table(sdcInitial@manipKeyVars$age)
 ```{r}
 #Recode Age 
 #Top
-sdcInitial <- groupAndRename(obj= sdcInitial, var= c("age"), before=c(?), after=c(?))  
+sdcInitial <- groupAndRename(obj= sdcInitial, var= c("age"), before=c("8","9","10"), after=c("8-10"))  
 
 #Bottom
-sdcInitial <- groupAndRename(obj= sdcInitial, var= c("age"), before=c(?), after=c(?))
+sdcInitial <- groupAndRename(obj= sdcInitial, var= c("age"), before=c("11","12","13"), after=c("11-13"))
 ```
 
 #### Important Note: Undoing things
@@ -188,7 +188,7 @@ Time for a more powerful technique. Let's use the k-anonymization function!
 
 ```{r}
 #Local suppression to obtain k-anonymity
-?
+sdcInitial <- kAnon(sdcInitial, k=c(5))
   
 #Setting the parameters that we aim for at least 5 observations sharing the same attributes in the dataset.
 #Alternatively, we could have set the order of importance for each keyvariables
@@ -201,9 +201,10 @@ Time to check it again:
 
 ```{r}
 #Global Risk
+sdcInitial@risk$global$risk
 
 #Let's compare it again
-
+print(sdcInitial, 'kAnon')
 
 
 ```
